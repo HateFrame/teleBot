@@ -43,23 +43,25 @@ def log_errors(f):
     return inner
 
 
-@log_errors
-def do_echo(update: Update, context: CallbackContext):
-    chat_id = update.message.chat_id
-    text = update.message.text
+def do_start(update: Update, context: CallbackContext):
+    bot_functions.get_profile(update)
+    text = "Привет! Нажмите /help для отображения команд."
+    update.message.reply_text(text)
 
-    p, _ = Profile.objects.get_or_create(
-        external_id=chat_id,
-        defaults={
-            'name': update.message.from_user.username,
-        }
-    )
+
+@log_errors
+def do_dialogflow(update: Update, context: CallbackContext):
+    text = update.message.text
+    p = bot_functions.get_profile(update)
     Message(
         profile=p,
         text=text,
     ).save()
     if bot_functions.check_form_state(update):
         return
+
+    reply = bot_functions.detect_intent_texts(text)
+    update.message.reply_text(reply)
 
 
 @log_errors
@@ -71,10 +73,54 @@ def do_help(update: Update, context: CallbackContext):
            "/form - заполнить анкету\n" \
            "/delete_form - удалить анкету\n" \
            "/edit_form - изменить анкету\n" \
-           "/show_form - посмотреть анкету"
+           "/show_form - посмотреть анкету\n" \
+           "/shop - открыть магазин\n" \
+           "/show_cart - показать корзину"
     update.message.reply_text(
         text=text,
     )
+
+
+def do_display_shop(update: Update, context: CallbackContext):
+    if bot_functions.check_form_state(update):
+        return
+    text = "Выберете нужную категорию."
+    update.message.reply_text(text=text, reply_markup=bot_functions.get_keyboardmarkup_shop())
+
+
+def do_show_product(update: Update, context: CallbackContext):
+    product_id = update.message.text.replace('/show', '')
+    text = bot_functions.get_product(product_id)
+    update.message.reply_text(text=text)
+
+
+def do_callbackhandler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    data = query.data
+    chat_id = query.message.chat_id
+    text = bot_functions.get_menu(data)
+    context.bot.sendMessage(chat_id=chat_id, text=text)
+
+
+def do_add_to_cart(update: Update, context: CallbackContext):
+    product_id = update.message.text.replace('/add', '')
+    text = bot_functions.add_to_cart(product_id, update)
+    update.message.reply_text(text=text)
+
+
+def do_show_cart(update: Update, context: CallbackContext):
+    text = bot_functions.show_cart(update)
+    update.message.reply_text(text=text)
+
+
+def do_clear_cart(update: Update, context: CallbackContext):
+    text = bot_functions.clear_cart(update)
+    update.message.reply_text(text=text)
+
+
+def do_accept_order(update: Update, context: CallbackContext):
+    text = bot_functions.accept_order(update)
+    update.message.reply_text(text)
 
 
 @log_errors
@@ -389,18 +435,32 @@ class Command(BaseCommand):
             ]
         )
 
+        start_handler = CommandHandler("start", do_start)
+        callback_handler = CallbackQueryHandler(callback=do_callbackhandler)
         help_handler = CommandHandler("help", do_help)
         delete_form_handler = CommandHandler("delete_form", do_delete_form)
-        message_handler = MessageHandler(Filters.text, do_echo)
-        cancel_handler = CommandHandler("cancel", do_cancel)
         send_form_handler = CommandHandler("show_form", do_send_form)
+        send_shop = CommandHandler("shop", do_display_shop)
+        show_product_handler = MessageHandler(Filters.regex(r'/show[0-9]{1,9}'), do_show_product)
+        add_to_cart_handler = MessageHandler(Filters.regex(r'/add[0-9]{1,9}'), do_add_to_cart)
+        show_cart_handler = CommandHandler("show_cart", do_show_cart)
+        clear_cart_handler = CommandHandler("clear_cart", do_clear_cart)
+        accept_order_handler = CommandHandler("accept_order", do_accept_order)
 
-        updater.dispatcher.add_handler(cancel_handler)
+        message_handler = MessageHandler(Filters.text, do_dialogflow)
+        updater.dispatcher.add_handler(start_handler)
         updater.dispatcher.add_handler(help_handler)
         updater.dispatcher.add_handler(form_handler)
         updater.dispatcher.add_handler(delete_form_handler)
         updater.dispatcher.add_handler(edit_form_handler)
         updater.dispatcher.add_handler(send_form_handler)
+        updater.dispatcher.add_handler(send_shop)
+        updater.dispatcher.add_handler(callback_handler)
+        updater.dispatcher.add_handler(show_product_handler)
+        updater.dispatcher.add_handler(add_to_cart_handler)
+        updater.dispatcher.add_handler(show_cart_handler)
+        updater.dispatcher.add_handler(clear_cart_handler)
+        updater.dispatcher.add_handler(accept_order_handler)
 
         updater.dispatcher.add_handler(message_handler)
 

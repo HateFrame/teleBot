@@ -35,6 +35,7 @@ class Profile(models.Model):
     )
     name = models.TextField(
         verbose_name='User name',
+        default='Unnamed',
     )
     statement = models.BooleanField(
         verbose_name='Form process status',
