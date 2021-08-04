@@ -119,7 +119,7 @@ STATIC_URL = '/static/'
 
 # Bot settings
 
-TOKEN = "1564801291:AAHK9O_9_RCu0TXD7-Ea6wV2S0BI2Fk8Vvg"
+TOKEN = "TOKEN"
 
 # DialogFlow settings
 
